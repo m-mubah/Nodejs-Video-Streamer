@@ -3,13 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const app = express();
 
-//home route to send a webpage
-// app.get('/', function(req, res) {
-//     res.sendFile(path.join(__dirname + '/index.html'));
-// });
-
 //function to establish a video stream
-function send_video_stream(filepath, req,res) {
+function send_video_stream(filepath, req, res) {
   const path = filepath;
   const stat = fs.statSync(path);
   const fileSize = stat.size;
@@ -38,17 +33,37 @@ function send_video_stream(filepath, req,res) {
   }
 }
 
-//send a video to home route
-app.get("/", function(req, res) {
-  let ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-  console.log(ip);
-  if(ip === '192.168.120.206'){
-    send_video_stream('assets/video_2.mp4', req,res);
-  } else {
-    send_video_stream('assets/sample.mp4', req,res);
+//define json file in global scope
+let ipMap = fs.readFileSync("ip_map.json");
+let ipMapJSON = JSON.parse(ipMap);
+console.log(ipMapJSON);
+
+//update the json file whenever it changes
+function load_ip_map_json() {
+  ipMap = fs.readFileSync("ip_map.json");
+  ipMapJSON = JSON.parse(ipMap);
+  return ipMapJSON;
+}
+
+//watch ip_map.json for changes
+fs.watch("./ip_map.json", (event, filename) => {
+  if (filename) {
+    console.log(`${filename} file Changed`);
+    load_ip_map_json();
+    console.log(ipMapJSON);
   }
 });
 
-app.listen(3000, '0.0.0.0', function() {
+//send a video to home route
+app.get("/", function(req, res) {
+  let ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  let ipString = ip.toString();
+  console.log(ipMapJSON[ipString]);
+
+  send_video_stream(ipMapJSON[ipString], req, res);
+  
+});
+
+app.listen(3000, "0.0.0.0", function() {
   console.log("App is running on port 3000");
 });
